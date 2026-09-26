@@ -19,7 +19,11 @@ class CashService:
         s=self.conn.execute("SELECT * FROM cash_sessions WHERE id=? AND tenant_id=?",(session_id,tenant_id)).fetchone()
         if not s: raise ValueError('Sessão não encontrada.')
         sales=self.conn.execute("SELECT COALESCE(SUM(total),0) total,COALESCE(SUM(vat),0) vat FROM sales WHERE tenant_id=? AND created_at>=? AND status='completed'",(tenant_id,s['opened_at'])).fetchone()
-        return {'opening':s['opening_amount'],'sales':sales['total'],'vat':sales['vat'],'expected':s['opening_amount']+sales['total']}
+        movements=self.conn.execute("SELECT COALESCE(SUM(CASE WHEN kind='income' THEN amount ELSE 0 END),0) income,COALESCE(SUM(CASE WHEN kind='expense' THEN amount ELSE 0 END),0) expense FROM finance_movements WHERE tenant_id=? AND created_at>=?",(tenant_id,s['opened_at'])).fetchone()
+        expected=s['opening_amount']+sales['total']+movements['income']-movements['expense']
+        return {'opening':s['opening_amount'],'sales':sales['total'],'vat':sales['vat'],'income':movements['income'],'expense':movements['expense'],'expected':expected}
+    def history(self, tenant_id, limit=100):
+        return self.conn.execute("SELECT * FROM cash_sessions WHERE tenant_id=? ORDER BY opened_at DESC LIMIT ?",(tenant_id,limit)).fetchall()
 
 class FinanceService:
     def __init__(self, conn): self.conn=conn
@@ -28,3 +32,7 @@ class FinanceService:
         if amount<=0: raise ValueError('O valor deve ser maior que zero.')
         if kind not in ('income','expense'): raise ValueError('Tipo de movimento inválido.')
         self.ensure();self.conn.execute("INSERT INTO finance_movements VALUES(?,?,?,?,?,?,?)",(str(uuid.uuid4()),tenant_id,user_id,kind,description,amount,payment_method,datetime.now(timezone.utc).isoformat()))
+    def movements(self, tenant_id, limit=200):
+        self.ensure();return self.conn.execute("SELECT * FROM finance_movements WHERE tenant_id=? ORDER BY created_at DESC LIMIT ?",(tenant_id,limit)).fetchall()
+    def totals(self, tenant_id):
+        self.ensure();return self.conn.execute("SELECT COALESCE(SUM(CASE WHEN kind='income' THEN amount ELSE 0 END),0) income,COALESCE(SUM(CASE WHEN kind='expense' THEN amount ELSE 0 END),0) expense FROM finance_movements WHERE tenant_id=?",(tenant_id,)).fetchone()
