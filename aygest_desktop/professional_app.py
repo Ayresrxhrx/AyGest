@@ -1,13 +1,12 @@
 from __future__ import annotations
 import customtkinter as ctk
 from .enterprise_app import EnterpriseApp
-from .reservations_ui import ReservationsFrame, QuotationsFrame
 from .config import settings
 
 NAVY='#0B2239'; BG='#F4F7FA'; MUTED='#627D98'
 
 class ProfessionalApp(EnterpriseApp):
-    """Shell profissional para os módulos empresariais existentes."""
+    """Shell principal do AyGest: navegação empresarial sem módulos fora do escopo."""
     def build(self):
         self.grid_columnconfigure(1, weight=1); self.grid_rowconfigure(0, weight=1)
         side=ctk.CTkFrame(self,width=275,fg_color=NAVY,corner_radius=0); side.grid(row=0,column=0,sticky='nsew'); side.grid_propagate(False)
@@ -16,7 +15,7 @@ class ProfessionalApp(EnterpriseApp):
         ctk.CTkLabel(brand,text='GESTÃO EMPRESARIAL',font=ctk.CTkFont(size=9,weight='bold'),text_color='#70A5D5').pack(anchor='w')
         ctk.CTkLabel(brand,text=f"{self.user['name']}  •  {self.user['role']}",font=ctk.CTkFont(size=10,weight='bold'),text_color='#DCEAF7').pack(anchor='w',pady=(8,0))
         self.nav=ctk.CTkScrollableFrame(side,fg_color='transparent',scrollbar_button_color='#315675',scrollbar_button_hover_color='#527B9E'); self.nav.pack(fill='both',expand=True,padx=7,pady=(4,5))
-        groups=[('PRINCIPAL',['Dashboard','POS / Vendas','Facturação']),('GESTÃO',['Produtos','Stock','Clientes','Fornecedores','Compras']),('OPERAÇÃO',['Reservas','Cotações','Financeiro','Relatórios']),('ADMINISTRAÇÃO',['Utilizadores','Licenciamento','Configurações','Auditoria','Backup'])]
+        groups=[('PRINCIPAL',['Dashboard','POS / Vendas','Facturação']),('GESTÃO',['Produtos','Stock','Clientes','Fornecedores','Compras']),('FINANCEIRO',['Financeiro','Relatórios']),('ADMINISTRAÇÃO',['Utilizadores','Licenciamento','Configurações','Auditoria','Backup'])]
         self.buttons={}
         for title,items in groups:
             ctk.CTkLabel(self.nav,text=title,font=ctk.CTkFont(size=9,weight='bold'),text_color='#6D8BA5').pack(fill='x',padx=18,pady=(13,5))
@@ -26,10 +25,6 @@ class ProfessionalApp(EnterpriseApp):
         self.content=ctk.CTkFrame(self,fg_color=BG,corner_radius=0); self.content.grid(row=0,column=1,sticky='nsew')
         self.status=ctk.CTkLabel(self.content,text='  Pronto',anchor='w',height=25,text_color=MUTED,fg_color='#EAF0F6'); self.status.pack(side='bottom',fill='x')
     def open(self,module):
-        if module=='Reservas':
-            self.clear(); ReservationsFrame(self.content,self.db,self.tenant_id,self.user_id).pack(fill='both',expand=True); self._select(module); self._status('Reservas carregadas'); return
-        if module=='Cotações':
-            self.clear(); QuotationsFrame(self.content,self.db,self.tenant_id).pack(fill='both',expand=True); self._select(module); self._status('Cotações carregadas'); return
         super().open(module); self._select(module); self._status(f'{module} carregado')
     def _select(self,module):
         for name,button in self.buttons.items(): button.configure(fg_color='#173D60' if name==module else 'transparent')
