@@ -7,6 +7,7 @@ from .config import APP_NAME, DB_PATH
 from .products_ui import ProductsFrame
 from .pos_ui import POSFrame
 from .reservations_ui import ReservationsFrame, QuotationsFrame
+from .invoicing import InvoiceService
 from .security import generate_activation_key
 
 def utc_now(): return datetime.now(timezone.utc).isoformat()
@@ -34,9 +35,20 @@ class App(ctk.CTk):
         if m in ('Produtos','Stock'):return ProductsFrame(self.content,self.db,self.tenant_id).pack(fill='both',expand=True)
         if m=='Reservas':return ReservationsFrame(self.content,self.db,self.tenant_id,self.user_id).pack(fill='both',expand=True)
         if m=='Cotações':return QuotationsFrame(self.content,self.db,self.tenant_id).pack(fill='both',expand=True)
+        if m=='Facturação':return self.invoices()
         if m=='Licenciamento':return self.license()
-        ctk.CTkLabel(self.content,text=m,font=ctk.CTkFont(size=30,weight='bold'),text_color='#102A43').pack(padx=40,pady=(35,5),anchor='w')
-        ctk.CTkLabel(self.content,text='Módulo preparado para a fase seguinte.',text_color='#627D98').pack(padx=40,anchor='w')
+        ctk.CTkLabel(self.content,text=m,font=ctk.CTkFont(size=30,weight='bold'),text_color='#102A43').pack(padx=40,pady=(35,5),anchor='w');ctk.CTkLabel(self.content,text='Módulo preparado para a fase seguinte.',text_color='#627D98').pack(padx=40,anchor='w')
+    def invoices(self):
+        ctk.CTkLabel(self.content,text='Facturação',font=ctk.CTkFont(size=30,weight='bold'),text_color='#102A43').pack(padx=40,pady=(35,5),anchor='w');ctk.CTkLabel(self.content,text='Facturas e recibos gerados a partir das vendas do POS.',text_color='#627D98').pack(padx=40,anchor='w')
+        box=ctk.CTkScrollableFrame(self.content,fg_color='white');box.pack(fill='both',expand=True,padx=40,pady=25)
+        rows=self.db.conn.execute("SELECT id,document_no,total,vat,payment_method,created_at FROM sales WHERE tenant_id=? ORDER BY created_at DESC",(self.tenant_id,)).fetchall()
+        if not rows: ctk.CTkLabel(box,text='Ainda não existem vendas facturadas.',text_color='#627D98').pack(pady=40)
+        for r in rows:
+            card=ctk.CTkFrame(box,fg_color='#F8FAFC',corner_radius=10);card.pack(fill='x',pady=5,padx=5);ctk.CTkLabel(card,text=r['document_no'],font=ctk.CTkFont(weight='bold'),text_color='#102A43').pack(side='left',padx=15,pady=14);ctk.CTkLabel(card,text=f"{r['total']:.2f} MT · {r['payment_method']} · {r['created_at']}",text_color='#627D98').pack(side='left',padx=8);ctk.CTkButton(card,text='PDF A4',width=85,command=lambda x=r['id']:self.export_invoice(x,False)).pack(side='right',padx=5);ctk.CTkButton(card,text='POS',width=70,command=lambda x=r['id']:self.export_invoice(x,True)).pack(side='right',padx=5)
+    def export_invoice(self,sale_id,thermal):
+        try:
+            path=InvoiceService(self.db.conn).pdf(self.tenant_id,sale_id,thermal);messagebox.showinfo('Documento criado',f'Documento exportado com sucesso:\n{path}')
+        except Exception as e:messagebox.showerror('Exportação',str(e))
     def license(self):
         ctk.CTkLabel(self.content,text='Licenciamento',font=ctk.CTkFont(size=30,weight='bold'),text_color='#102A43').pack(padx=40,pady=35,anchor='w');r=self.db.conn.execute('SELECT * FROM licenses WHERE tenant_id=? LIMIT 1',(self.tenant_id,)).fetchone();ctk.CTkLabel(self.content,text=f"Plano: {r['plan']}\nEstado: {r['status']}\nExpira: {r['expires_at']}\nKey: {r['license_key']}",justify='left',font=ctk.CTkFont(size=15),text_color='#102A43').pack(padx=40,anchor='w')
 if __name__=='__main__':App().mainloop()
