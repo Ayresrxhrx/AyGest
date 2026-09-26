@@ -1,0 +1,14 @@
+using System.Collections.ObjectModel;using System.Globalization;using System.Linq;using System.Windows;using System.Windows.Controls;
+namespace AyGest.Wpf;
+public partial class PurchaseEditorWindow:Window{
+ readonly ObservableCollection<PurchaseItem> _items=new();
+ public PurchaseEditorWindow(){InitializeComponent();DateBox.SelectedDate=DateTime.Today;NumberBox.Text="COMP-"+DateTime.Now.ToString("yyyyMMddHHmmss");ItemsGrid.ItemsSource=_items;SupplierBox.Items.Add("Seleccionar fornecedor");SupplierBox.SelectedIndex=0;}
+ void Recalculate(){decimal subtotal=0,vat=0;foreach(var x in _items){x.Total=Math.Max(0,x.Quantity*x.UnitCost-x.Discount);subtotal+=x.Total;vat+=x.Total*x.Vat/100m;}SubtotalText.Text=$"Subtotal: {subtotal:N2} MT";VatText.Text=$"IVA: {vat:N2} MT";TotalText.Text=$"Total: {subtotal+vat:N2} MT";ItemsGrid.Items.Refresh();}
+ static bool DecimalValue(string value,out decimal result){return decimal.TryParse(value,NumberStyles.Any,CultureInfo.CurrentCulture,out result)||decimal.TryParse(value,NumberStyles.Any,CultureInfo.InvariantCulture,out result);}
+ bool ValidatePurchase(){if(string.IsNullOrWhiteSpace(NumberBox.Text)){MessageBox.Show("O número da compra é obrigatório.","Validação",MessageBoxButton.OK,MessageBoxImage.Warning);return false;}if(SupplierBox.SelectedIndex<=0){MessageBox.Show("Seleccione um fornecedor.","Validação",MessageBoxButton.OK,MessageBoxImage.Warning);return false;}if(!_items.Any()){MessageBox.Show("Adicione pelo menos um item.","Validação",MessageBoxButton.OK,MessageBoxImage.Warning);return false;}if(_items.Any(x=>x.Quantity<=0||x.UnitCost<0)){MessageBox.Show("Existem quantidades ou custos inválidos.","Validação",MessageBoxButton.OK,MessageBoxImage.Warning);return false;}return true;}
+ void Receive_Click(object s,RoutedEventArgs e){if(!ValidatePurchase())return;MessageBox.Show("Compra validada e pronta para recepção. O stock será actualizado pelo fluxo de recepção.","Recepção",MessageBoxButton.OK,MessageBoxImage.Information);DialogResult=true;}
+ void Draft_Click(object s,RoutedEventArgs e){if(string.IsNullOrWhiteSpace(NumberBox.Text)){MessageBox.Show("Informe o número da compra.");return;}MessageBox.Show("Rascunho da compra preparado.","Compras",MessageBoxButton.OK,MessageBoxImage.Information);DialogResult=true;}
+ void Cancel_Click(object s,RoutedEventArgs e)=>DialogResult=false;
+ void ItemsGrid_CellEditEnding(object s,DataGridCellEditEndingEventArgs e){Dispatcher.BeginInvoke(new Action(Recalculate));}
+ public sealed class PurchaseItem{public string Sku{get;set;}="";public string Product{get;set;}="";public decimal Quantity{get;set;}=1;public decimal UnitCost{get;set;}=0;public decimal Vat{get;set;}=16;public decimal Discount{get;set;}=0;public decimal Total{get;set;} }
+}
