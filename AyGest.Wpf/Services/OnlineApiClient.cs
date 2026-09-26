@@ -1,5 +1,5 @@
+using System.Net.Http;
 using System.Net.Http.Json;
-using System.Text.Json;
 namespace AyGest.Wpf.Services;
 public sealed class OnlineApiClient : IDisposable
 {
@@ -9,7 +9,8 @@ public sealed class OnlineApiClient : IDisposable
     public bool IsOnline { get; private set; }
     public OnlineApiClient(string baseUrl)
     {
-        _http = new HttpClient { BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(15) };
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri)) throw new ArgumentException("URL do servidor inválida.", nameof(baseUrl));
+        _http = new HttpClient { BaseAddress = new Uri(uri.ToString().TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(15) };
     }
     public async Task<bool> CheckHealthAsync(CancellationToken ct=default)
     {
@@ -18,9 +19,15 @@ public sealed class OnlineApiClient : IDisposable
     }
     public async Task<LicenseResponse> ActivateAsync(string key,string deviceId,string? tenantId=null,CancellationToken ct=default)
     {
-        var response=await _http.PostAsJsonAsync("api/v1/licenses/activate",new { key, device_id=deviceId, tenant_id=tenantId },ct);
-        var data=await response.Content.ReadFromJsonAsync<LicenseResponse>(cancellationToken:ct) ?? new();
-        if(data.Active){LicenseKey=key;TenantId=data.TenantId;IsOnline=true;} return data;
+        try
+        {
+            var response=await _http.PostAsJsonAsync("api/v1/licenses/activate",new { key, device_id=deviceId, tenant_id=tenantId },ct);
+            var data=await response.Content.ReadFromJsonAsync<LicenseResponse>(cancellationToken:ct) ?? new();
+            IsOnline=response.IsSuccessStatusCode;
+            if(data.Active){LicenseKey=key;TenantId=data.TenantId;}
+            return data;
+        }
+        catch { IsOnline=false; return new LicenseResponse{Active=false,Message="Servidor indisponível."}; }
     }
     public async Task<LicenseResponse> VerifyAsync(string key,string deviceId,string? tenantId=null,CancellationToken ct=default)
     {
