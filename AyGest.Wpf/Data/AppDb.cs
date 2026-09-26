@@ -1,0 +1,27 @@
+using Microsoft.Data.Sqlite;
+namespace AyGest.Wpf.Data;
+public sealed class AppDb
+{
+ public string Path { get; }=System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"AyGest","aygest.db");
+ public AppDb(){Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)!);Initialize();}
+ public SqliteConnection Open(){var c=new SqliteConnection($"Data Source={Path};Cache=Shared;Mode=ReadWriteCreate");c.Open();return c;}
+ void Initialize(){using var c=Open();using var x=c.CreateCommand();x.CommandText="PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;";x.ExecuteNonQuery();x.CommandText=@"
+CREATE TABLE IF NOT EXISTS companies(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL, nuit TEXT, address TEXT, phone TEXT,email TEXT, vat_rate REAL NOT NULL DEFAULT 16, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,company_id INTEGER NOT NULL,name TEXT NOT NULL,username TEXT UNIQUE NOT NULL,password_hash TEXT NOT NULL,role TEXT NOT NULL DEFAULT 'Operator',active INTEGER NOT NULL DEFAULT 1,FOREIGN KEY(company_id) REFERENCES companies(id));
+CREATE TABLE IF NOT EXISTS customers(id INTEGER PRIMARY KEY AUTOINCREMENT,company_id INTEGER NOT NULL,name TEXT NOT NULL,nuit TEXT,phone TEXT,email TEXT,address TEXT,active INTEGER NOT NULL DEFAULT 1,FOREIGN KEY(company_id) REFERENCES companies(id));
+CREATE TABLE IF NOT EXISTS suppliers(id INTEGER PRIMARY KEY AUTOINCREMENT,company_id INTEGER NOT NULL,name TEXT NOT NULL,nuit TEXT,phone TEXT,email TEXT,address TEXT,FOREIGN KEY(company_id) REFERENCES companies(id));
+CREATE TABLE IF NOT EXISTS categories(id INTEGER PRIMARY KEY AUTOINCREMENT,company_id INTEGER NOT NULL,name TEXT NOT NULL,UNIQUE(company_id,name),FOREIGN KEY(company_id) REFERENCES companies(id));
+CREATE TABLE IF NOT EXISTS products(id INTEGER PRIMARY KEY AUTOINCREMENT,company_id INTEGER NOT NULL,category_id INTEGER,name TEXT NOT NULL,sku TEXT,barcode TEXT,cost REAL NOT NULL DEFAULT 0,price REAL NOT NULL DEFAULT 0,vat_rate REAL NOT NULL DEFAULT 16,min_stock REAL NOT NULL DEFAULT 0,active INTEGER NOT NULL DEFAULT 1,FOREIGN KEY(company_id) REFERENCES companies(id));
+CREATE TABLE IF NOT EXISTS stock(id INTEGER PRIMARY KEY AUTOINCREMENT,product_id INTEGER NOT NULL UNIQUE,quantity REAL NOT NULL DEFAULT 0,FOREIGN KEY(product_id) REFERENCES products(id));
+CREATE TABLE IF NOT EXISTS purchases(id INTEGER PRIMARY KEY AUTOINCREMENT,company_id INTEGER NOT NULL,supplier_id INTEGER,number TEXT NOT NULL,total REAL NOT NULL,vat REAL NOT NULL,created_at TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'issued',FOREIGN KEY(company_id) REFERENCES companies(id));
+CREATE TABLE IF NOT EXISTS purchase_items(id INTEGER PRIMARY KEY AUTOINCREMENT,purchase_id INTEGER NOT NULL,product_id INTEGER NOT NULL,quantity REAL NOT NULL,unit_cost REAL NOT NULL,line_total REAL NOT NULL,FOREIGN KEY(purchase_id) REFERENCES purchases(id) ON DELETE CASCADE,FOREIGN KEY(product_id) REFERENCES products(id));
+CREATE TABLE IF NOT EXISTS invoices(id INTEGER PRIMARY KEY AUTOINCREMENT,company_id INTEGER NOT NULL,customer_id INTEGER,number TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'issued',subtotal REAL NOT NULL,vat REAL NOT NULL,total REAL NOT NULL,payment_method TEXT,created_at TEXT NOT NULL,cancelled_at TEXT,cancellation_reason TEXT,FOREIGN KEY(company_id) REFERENCES companies(id),FOREIGN KEY(customer_id) REFERENCES customers(id));
+CREATE TABLE IF NOT EXISTS invoice_items(id INTEGER PRIMARY KEY AUTOINCREMENT,invoice_id INTEGER NOT NULL,product_id INTEGER NOT NULL,description TEXT NOT NULL,quantity REAL NOT NULL,unit_price REAL NOT NULL,vat_rate REAL NOT NULL,line_total REAL NOT NULL,FOREIGN KEY(invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,FOREIGN KEY(product_id) REFERENCES products(id));
+CREATE TABLE IF NOT EXISTS cash_sessions(id INTEGER PRIMARY KEY AUTOINCREMENT,company_id INTEGER NOT NULL,user_id INTEGER,opened_at TEXT NOT NULL,closed_at TEXT,opening_amount REAL NOT NULL,closing_amount REAL,expected_amount REAL,status TEXT NOT NULL DEFAULT 'open',FOREIGN KEY(company_id) REFERENCES companies(id));
+CREATE TABLE IF NOT EXISTS cash_movements(id INTEGER PRIMARY KEY AUTOINCREMENT,session_id INTEGER NOT NULL,type TEXT NOT NULL,description TEXT,amount REAL NOT NULL,payment_method TEXT,created_at TEXT NOT NULL,FOREIGN KEY(session_id) REFERENCES cash_sessions(id));
+CREATE TABLE IF NOT EXISTS stock_movements(id INTEGER PRIMARY KEY AUTOINCREMENT,product_id INTEGER NOT NULL,type TEXT NOT NULL,quantity REAL NOT NULL,reference TEXT,created_at TEXT NOT NULL,FOREIGN KEY(product_id) REFERENCES products(id));
+CREATE TABLE IF NOT EXISTS audit_log(id INTEGER PRIMARY KEY AUTOINCREMENT,company_id INTEGER NOT NULL,user_id INTEGER,action TEXT NOT NULL,entity TEXT,entity_id INTEGER,details TEXT,created_at TEXT NOT NULL,FOREIGN KEY(company_id) REFERENCES companies(id));
+CREATE TABLE IF NOT EXISTS licenses(id INTEGER PRIMARY KEY AUTOINCREMENT,company_id INTEGER NOT NULL,key_value TEXT UNIQUE NOT NULL,plan TEXT,expires_at TEXT,active INTEGER NOT NULL DEFAULT 1,device_id TEXT,FOREIGN KEY(company_id) REFERENCES companies(id));
+CREATE TABLE IF NOT EXISTS app_settings(key TEXT PRIMARY KEY,value TEXT);
+";x.ExecuteNonQuery();}
+}
