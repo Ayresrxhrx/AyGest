@@ -1,0 +1,34 @@
+name: Build AyGest
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  desktop:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: dotnet restore AyGest.Wpf/AyGest.Wpf.csproj
+      - run: dotnet build AyGest.Wpf/AyGest.Wpf.csproj -c Release --no-restore
+      - run: dotnet publish AyGest.Wpf/AyGest.Wpf.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AyGest-WPF-win-x64
+          path: publish/*
+  server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: dotnet restore AyGest.Server/AyGest.Server.csproj
+      - run: dotnet build AyGest.Server/AyGest.Server.csproj -c Release --no-restore
+      - run: dotnet publish AyGest.Server/AyGest.Server.csproj -c Release --self-contained false -o server-publish
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AyGest-Server
+          path: server-publish/*
