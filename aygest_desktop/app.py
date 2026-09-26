@@ -9,7 +9,8 @@ from .pos_ui import POSFrame
 from .reservations_ui import ReservationsFrame, QuotationsFrame
 from .invoicing import InvoiceService
 from .security import generate_activation_key
-from .finance import CashService, FinanceService
+from .finance import CashService
+from .reports_ui import ReportsFrame
 
 def utc_now(): return datetime.now(timezone.utc).isoformat()
 class Database:
@@ -36,6 +37,7 @@ class App(ctk.CTk):
         if m in ('Produtos','Stock'):return ProductsFrame(self.content,self.db,self.tenant_id).pack(fill='both',expand=True)
         if m=='Reservas':return ReservationsFrame(self.content,self.db,self.tenant_id,self.user_id).pack(fill='both',expand=True)
         if m=='Cotações':return QuotationsFrame(self.content,self.db,self.tenant_id).pack(fill='both',expand=True)
+        if m=='Relatórios':return ReportsFrame(self.content,self.db,self.tenant_id).pack(fill='both',expand=True)
         if m=='Facturação':return self.invoices()
         if m in ('Clientes','Fornecedores'):return self.contacts(m)
         if m=='Compras':return self.purchases()
@@ -43,13 +45,9 @@ class App(ctk.CTk):
         if m=='Licenciamento':return self.license()
         ctk.CTkLabel(self.content,text=m,font=ctk.CTkFont(size=30,weight='bold'),text_color='#102A43').pack(padx=40,pady=(35,5),anchor='w');ctk.CTkLabel(self.content,text='Módulo preparado para a fase seguinte.',text_color='#627D98').pack(padx=40,anchor='w')
     def finance(self):
-        ctk.CTkLabel(self.content,text='Financeiro & Caixa',font=ctk.CTkFont(size=30,weight='bold'),text_color='#102A43').pack(anchor='w',padx=40,pady=(35,5));body=ctk.CTkFrame(self.content,fg_color='white',corner_radius=14);body.pack(fill='x',padx=40,pady=20);cash=CashService(self.db.conn);active=cash.active(self.tenant_id,self.user_id)
-        status='CAIXA ABERTO' if active else 'CAIXA FECHADO';ctk.CTkLabel(body,text=status,font=ctk.CTkFont(size=18,weight='bold')).pack(anchor='w',padx=25,pady=(22,5));info=ctk.CTkLabel(body,text='',text_color='#627D98');info.pack(anchor='w',padx=25,pady=5)
+        ctk.CTkLabel(self.content,text='Financeiro & Caixa',font=ctk.CTkFont(size=30,weight='bold'),text_color='#102A43').pack(anchor='w',padx=40,pady=(35,5));body=ctk.CTkFrame(self.content,fg_color='white',corner_radius=14);body.pack(fill='x',padx=40,pady=20);cash=CashService(self.db.conn);active=cash.active(self.tenant_id,self.user_id);ctk.CTkLabel(body,text='CAIXA ABERTO' if active else 'CAIXA FECHADO',font=ctk.CTkFont(size=18,weight='bold')).pack(anchor='w',padx=25,pady=(22,5));info=ctk.CTkLabel(body,text='',text_color='#627D98');info.pack(anchor='w',padx=25,pady=5)
         def refresh():
-            nonlocal active;active=cash.active(self.tenant_id,self.user_id)
-            if active:
-                sm=cash.summary(self.tenant_id,active['id']);info.configure(text=f"Abertura: {sm['opening']:.2f} MT   |   Vendas: {sm['sales']:.2f} MT   |   Esperado: {sm['expected']:.2f} MT")
-            else:info.configure(text='Nenhuma sessão de caixa aberta.')
+            nonlocal active;active=cash.active(self.tenant_id,self.user_id);info.configure(text=(lambda sm:f"Abertura: {sm['opening']:.2f} MT | Vendas: {sm['sales']:.2f} MT | Esperado: {sm['expected']:.2f} MT")(cash.summary(self.tenant_id,active['id'])) if active else 'Nenhuma sessão de caixa aberta.')
         def toggle():
             nonlocal active
             try:
@@ -61,9 +59,6 @@ class App(ctk.CTk):
                     if val is not None:cash.open_session(self.tenant_id,self.user_id,val);refresh()
             except Exception as e:messagebox.showerror('Caixa',str(e),parent=self)
         ctk.CTkButton(body,text='Abrir / Fechar Caixa',command=toggle).pack(anchor='w',padx=25,pady=(10,25));refresh()
-        ctk.CTkLabel(self.content,text='Movimentos recentes',font=ctk.CTkFont(size=20,weight='bold'),text_color='#102A43').pack(anchor='w',padx=40,pady=(15,5));box=ctk.CTkScrollableFrame(self.content,fg_color='white');box.pack(fill='both',expand=True,padx=40,pady=(0,25))
-        for r in self.db.conn.execute('SELECT * FROM finance_movements WHERE tenant_id=? ORDER BY created_at DESC LIMIT 100',(self.tenant_id,)).fetchall():
-            c=ctk.CTkFrame(box,fg_color='#F8FAFC',corner_radius=10);c.pack(fill='x',pady=4,padx=5);ctk.CTkLabel(c,text=r['description'],font=ctk.CTkFont(weight='bold')).pack(side='left',padx=15,pady=12);ctk.CTkLabel(c,text=f"{r['kind']} · {r['amount']:.2f} MT · {r['payment_method']}",text_color='#627D98').pack(side='left')
     def contacts(self,m):
         table='customers' if m=='Clientes' else 'suppliers';ctk.CTkLabel(self.content,text=m,font=ctk.CTkFont(size=30,weight='bold'),text_color='#102A43').pack(anchor='w',padx=40,pady=(35,4));box=ctk.CTkScrollableFrame(self.content,fg_color='white');box.pack(fill='both',expand=True,padx=40,pady=20)
         for r in self.db.conn.execute(f'SELECT * FROM {table} WHERE tenant_id=? ORDER BY name',(self.tenant_id,)).fetchall():
