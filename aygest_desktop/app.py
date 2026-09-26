@@ -8,20 +8,18 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from .config import APP_NAME, DB_PATH
+from .products_ui import ProductsFrame
 from .security import generate_activation_key
 
 
-def utc_now() -> str:
+def utc_now():
     return datetime.now(timezone.utc).isoformat()
 
 
 class Database:
     def __init__(self, path=DB_PATH):
-        self.conn = sqlite3.connect(path, timeout=20, isolation_level=None)
-        self.conn.row_factory = sqlite3.Row
-        self.conn.execute("PRAGMA journal_mode=WAL")
-        self.conn.execute("PRAGMA foreign_keys=ON")
-        self.migrate()
+        self.conn=sqlite3.connect(path,timeout=20,isolation_level=None); self.conn.row_factory=sqlite3.Row
+        self.conn.execute("PRAGMA journal_mode=WAL"); self.conn.execute("PRAGMA foreign_keys=ON"); self.migrate()
 
     def migrate(self):
         self.conn.executescript('''
@@ -39,40 +37,29 @@ class Database:
         ''')
 
     def bootstrap(self):
-        if self.conn.execute("SELECT 1 FROM tenants LIMIT 1").fetchone():
-            return
-        tenant_id = str(uuid.uuid4())
-        self.conn.execute("INSERT INTO tenants VALUES(?,?,?,?)", (tenant_id, "Minha Empresa", "", utc_now()))
-        key = generate_activation_key()
-        expires = (datetime.now(timezone.utc) + timedelta(days=365)).isoformat()
-        self.conn.execute("INSERT INTO licenses VALUES(?,?,?,?,?,?)", (str(uuid.uuid4()), tenant_id, key, "Professional", "active", expires))
-        self.conn.execute("INSERT INTO users VALUES(?,?,?,?,?,?)", (str(uuid.uuid4()), tenant_id, "Administrador", "admin@local", "owner", 1))
+        row=self.conn.execute("SELECT id FROM tenants LIMIT 1").fetchone()
+        if row: return row["id"]
+        tenant_id=str(uuid.uuid4()); self.conn.execute("INSERT INTO tenants VALUES(?,?,?,?)",(tenant_id,"Minha Empresa","",utc_now()))
+        self.conn.execute("INSERT INTO licenses VALUES(?,?,?,?,?,?)",(str(uuid.uuid4()),tenant_id,generate_activation_key(),"Professional","active",(datetime.now(timezone.utc)+timedelta(days=365)).isoformat()))
+        self.conn.execute("INSERT INTO users VALUES(?,?,?,?,?,?)",(str(uuid.uuid4()),tenant_id,"Administrador","admin@local","owner",1))
+        return tenant_id
 
 
 class App(ctk.CTk):
     def __init__(self):
-        super().__init__()
-        self.title(APP_NAME)
-        self.geometry("1440x900")
-        self.minsize(1180, 760)
-        ctk.set_appearance_mode("light")
-        ctk.set_default_color_theme("blue")
-        self.db = Database()
-        self.db.bootstrap()
-        self._build_shell()
+        super().__init__(); self.title(APP_NAME); self.geometry("1440x900"); self.minsize(1180,760)
+        ctk.set_appearance_mode("light"); ctk.set_default_color_theme("blue")
+        self.db=Database(); self.tenant_id=self.db.bootstrap(); self._build_shell()
 
     def _build_shell(self):
-        self.grid_columnconfigure(1, weight=1); self.grid_rowconfigure(0, weight=1)
-        sidebar = ctk.CTkFrame(self, width=250, corner_radius=0, fg_color="#0B2239")
-        sidebar.grid(row=0,column=0,sticky="nsew"); sidebar.grid_propagate(False)
+        self.grid_columnconfigure(1,weight=1); self.grid_rowconfigure(0,weight=1)
+        sidebar=ctk.CTkFrame(self,width=250,corner_radius=0,fg_color="#0B2239"); sidebar.grid(row=0,column=0,sticky="nsew"); sidebar.grid_propagate(False)
         ctk.CTkLabel(sidebar,text="AyGest",font=ctk.CTkFont(size=28,weight="bold"),text_color="white").pack(padx=24,pady=(30,3),anchor="w")
         ctk.CTkLabel(sidebar,text="BUSINESS MANAGEMENT",font=ctk.CTkFont(size=10,weight="bold"),text_color="#AFC4D8").pack(padx=26,pady=(0,25),anchor="w")
-        modules=["Dashboard","POS / Vendas","Facturação","Produtos","Stock","Reservas","Cotações","Clientes","Fornecedores","Compras","Financeiro","Relatórios","Utilizadores","Licenciamento","Configurações"]
-        for module in modules:
+        for module in ["Dashboard","POS / Vendas","Facturação","Produtos","Stock","Reservas","Cotações","Clientes","Fornecedores","Compras","Financeiro","Relatórios","Utilizadores","Licenciamento","Configurações"]:
             ctk.CTkButton(sidebar,text=module,anchor="w",height=40,corner_radius=8,fg_color="transparent",hover_color="#173D60",text_color="#EAF2F8",command=lambda m=module:self.open_module(m)).pack(fill="x",padx=12,pady=2)
         ctk.CTkLabel(sidebar,text="ONLINE · MULTI-TENANT",text_color="#7FD6A8",font=ctk.CTkFont(size=10,weight="bold")).pack(side="bottom",padx=20,pady=24,anchor="w")
-        self.content=ctk.CTkFrame(self,fg_color="#F5F7FA",corner_radius=0); self.content.grid(row=0,column=1,sticky="nsew")
-        self.open_module("Dashboard")
+        self.content=ctk.CTkFrame(self,fg_color="#F5F7FA",corner_radius=0); self.content.grid(row=0,column=1,sticky="nsew"); self.open_module("Dashboard")
 
     def clear(self):
         for child in self.content.winfo_children(): child.destroy()
@@ -80,28 +67,25 @@ class App(ctk.CTk):
     def open_module(self,module):
         self.clear()
         if module=="Dashboard": return self.dashboard()
+        if module in ("Produtos","Stock"): return ProductsFrame(self.content,self.db,self.tenant_id).pack(fill="both",expand=True)
         if module=="Licenciamento": return self.licensing()
         ctk.CTkLabel(self.content,text=module,font=ctk.CTkFont(size=30,weight="bold"),text_color="#102A43").pack(padx=40,pady=(35,5),anchor="w")
-        ctk.CTkLabel(self.content,text="Módulo da Fase 1 preparado para ligação à API e aos serviços do AyGest.",text_color="#627D98").pack(padx=40,anchor="w")
+        ctk.CTkLabel(self.content,text="Este módulo será implementado na fase correspondente.",text_color="#627D98").pack(padx=40,anchor="w")
 
     def dashboard(self):
         ctk.CTkLabel(self.content,text="Dashboard",font=ctk.CTkFont(size=30,weight="bold"),text_color="#102A43").pack(padx=40,pady=(35,4),anchor="w")
         ctk.CTkLabel(self.content,text="Visão geral do negócio",text_color="#627D98").pack(padx=40,anchor="w")
         grid=ctk.CTkFrame(self.content,fg_color="transparent"); grid.pack(fill="x",padx=40,pady=30)
         for i,(name,value) in enumerate([("Vendas hoje","0,00 MT"),("Stock disponível","0"),("Reservas activas","0"),("Cotações abertas","0")]):
-            grid.grid_columnconfigure(i,weight=1)
-            card=ctk.CTkFrame(grid,fg_color="white",corner_radius=14,border_width=1,border_color="#E1E8EF"); card.grid(row=0,column=i,padx=6,sticky="nsew")
-            ctk.CTkLabel(card,text=name,text_color="#627D98",font=ctk.CTkFont(size=12,weight="bold")).pack(padx=20,pady=(20,6),anchor="w")
-            ctk.CTkLabel(card,text=value,text_color="#102A43",font=ctk.CTkFont(size=24,weight="bold")).pack(padx=20,pady=(0,20),anchor="w")
+            grid.grid_columnconfigure(i,weight=1); card=ctk.CTkFrame(grid,fg_color="white",corner_radius=14,border_width=1,border_color="#E1E8EF"); card.grid(row=0,column=i,padx=6,sticky="nsew")
+            ctk.CTkLabel(card,text=name,text_color="#627D98",font=ctk.CTkFont(size=12,weight="bold")).pack(padx=20,pady=(20,6),anchor="w"); ctk.CTkLabel(card,text=value,text_color="#102A43",font=ctk.CTkFont(size=24,weight="bold")).pack(padx=20,pady=(0,20),anchor="w")
 
     def licensing(self):
         ctk.CTkLabel(self.content,text="Licenciamento",font=ctk.CTkFont(size=30,weight="bold"),text_color="#102A43").pack(padx=40,pady=(35,5),anchor="w")
         row=ctk.CTkFrame(self.content,fg_color="white",corner_radius=14); row.pack(fill="x",padx=40,pady=25)
-        license_row=self.db.conn.execute("SELECT license_key,plan,status,expires_at FROM licenses LIMIT 1").fetchone()
-        text=f"Plano: {license_row['plan']}\nEstado: {license_row['status']}\nExpira: {license_row['expires_at']}\nKey: {license_row['license_key']}"
+        r=self.db.conn.execute("SELECT license_key,plan,status,expires_at FROM licenses WHERE tenant_id=? LIMIT 1",(self.tenant_id,)).fetchone(); text=f"Plano: {r['plan']}\nEstado: {r['status']}\nExpira: {r['expires_at']}\nKey: {r['license_key']}"
         ctk.CTkLabel(row,text=text,justify="left",font=ctk.CTkFont(size=15),text_color="#102A43").pack(padx=25,pady=25,anchor="w")
         ctk.CTkButton(row,text="Verificar licença",command=lambda:messagebox.showinfo("AyGest","A licença será validada pelo servidor quando a API cloud estiver configurada.")).pack(padx=25,pady=(0,25),anchor="w")
 
 
-if __name__ == "__main__":
-    App().mainloop()
+if __name__=="__main__": App().mainloop()
