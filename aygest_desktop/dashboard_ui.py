@@ -31,8 +31,8 @@ class DashboardFrame(ctk.CTkFrame):
             while m<=0:m+=12;y-=1
             start=datetime(y,m,1,tzinfo=timezone.utc);end=datetime(y+1,1,1,tzinfo=timezone.utc) if m==12 else datetime(y,m+1,1,tzinfo=timezone.utc);r=self.db.conn.execute("SELECT COALESCE(SUM(total),0) total FROM sales WHERE tenant_id=? AND status='completed' AND created_at>=? AND created_at<?",(self.tenant_id,start.isoformat(),end.isoformat())).fetchone();self.trend.append((start.strftime('%b').title(),float(r['total'])))
     def draw_chart(self):
-        if not hasattr(self,'trend'):return
-        self.chart.delete('all');w=max(300,self.chart.winfo_width());h=max(220,self.chart.winfo_height());pad=38;maxv=max([v for _,v in self.trend] or [1]);self.chart.create_line(pad,h-pad,w-pad,h-pad,fill='#D9E2EC');self.chart.create_line(pad,pad,pad,h-pad,fill='#D9E2EC');pts=[]
+        if not hasattr(self,'trend') or not self.chart.winfo_exists():return
+        self.chart.delete('all');w=max(300,self.chart.winfo_width());h=max(220,self.chart.winfo_height());pad=38;values=[max(0.0,float(v)) for _,v in self.trend];scale=max(max(values,default=0.0),1.0);count=max(1,len(self.trend)-1);self.chart.create_line(pad,h-pad,w-pad,h-pad,fill='#D9E2EC');self.chart.create_line(pad,pad,pad,h-pad,fill='#D9E2EC');pts=[]
         for i,(label,val) in enumerate(self.trend):
-            x=pad+i*((w-2*pad)/max(1,len(self.trend)-1));y=h-pad-(val/maxv)*(h-2*pad);pts.append((x,y));self.chart.create_oval(x-4,y-4,x+4,y+4,fill=BLUE,outline=BLUE);self.chart.create_text(x,h-18,text=label,fill=MUTED,font=('Segoe UI',9));self.chart.create_text(x,y-13,text=money(val).replace(' MT',''),fill=NAVY,font=('Segoe UI',8,'bold'))
+            x=pad+i*((w-2*pad)/count);y=h-pad-(max(0.0,float(val))/scale)*(h-2*pad);pts.append((x,y));self.chart.create_oval(x-4,y-4,x+4,y+4,fill=BLUE,outline=BLUE);self.chart.create_text(x,h-18,text=label,fill=MUTED,font=('Segoe UI',9));self.chart.create_text(x,y-13,text=money(val).replace(' MT',''),fill=NAVY,font=('Segoe UI',8,'bold'))
         if len(pts)>1:self.chart.create_line(*[v for p in pts for v in p],fill=BLUE,width=3,smooth=True)
