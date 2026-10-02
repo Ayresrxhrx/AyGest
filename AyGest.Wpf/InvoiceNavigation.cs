@@ -1,10 +1,8 @@
-using System.Windows;
 namespace AyGest.Wpf;
+
+// O handler InvoiceMap_Click vive no MainWindow.xaml.cs.
+// Este ficheiro permanece como extensão reservada para navegação adicional,
+// evitando duplicar membros da partial class MainWindow.
 public partial class MainWindow
 {
-    void InvoiceMap_Click(object sender,RoutedEventArgs e)
-    {
-        var hub=new InvoiceHubWindow(this,companyId){Owner=this};
-        hub.ShowDialog();
-    }
 }
