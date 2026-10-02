@@ -27,10 +27,17 @@ CREATE TABLE IF NOT EXISTS stock_movements(id INTEGER PRIMARY KEY AUTOINCREMENT,
 CREATE TABLE IF NOT EXISTS audit_log(id INTEGER PRIMARY KEY AUTOINCREMENT,company_id INTEGER NOT NULL,user_id INTEGER,action TEXT NOT NULL,entity TEXT,entity_id INTEGER,details TEXT,created_at TEXT NOT NULL,FOREIGN KEY(company_id) REFERENCES companies(id));
 CREATE TABLE IF NOT EXISTS licenses(id INTEGER PRIMARY KEY AUTOINCREMENT,company_id INTEGER NOT NULL,key_value TEXT UNIQUE NOT NULL,plan TEXT,expires_at TEXT,active INTEGER NOT NULL DEFAULT 1,device_id TEXT,FOREIGN KEY(company_id) REFERENCES companies(id));
 CREATE TABLE IF NOT EXISTS app_settings(key TEXT PRIMARY KEY,value TEXT);
-";x.ExecuteNonQuery();
-  EnsureColumn(c,"products","category_id","INTEGER");EnsureColumn(c,"products","unit_id","INTEGER");EnsureColumn(c,"invoices","payment_method_id","INTEGER");
-  SeedDefaults(c);
- }
+CREATE TRIGGER IF NOT EXISTS trg_company_defaults AFTER INSERT ON companies BEGIN
+ INSERT OR IGNORE INTO units(company_id,name,abbreviation) VALUES(NEW.id,'Unidade','UN');
+ INSERT OR IGNORE INTO tax_rates(company_id,name,rate) VALUES(NEW.id,'IVA normal',NEW.vat_rate);
+ INSERT OR IGNORE INTO payment_methods(company_id,name,code,sort_order) VALUES(NEW.id,'Dinheiro','CASH',1);
+ INSERT OR IGNORE INTO payment_methods(company_id,name,code,sort_order) VALUES(NEW.id,'Cartão','CARD',2);
+ INSERT OR IGNORE INTO payment_methods(company_id,name,code,sort_order) VALUES(NEW.id,'M-Pesa','MPESA',3);
+ INSERT OR IGNORE INTO payment_methods(company_id,name,code,sort_order) VALUES(NEW.id,'e-Mola','EMOLA',4);
+ INSERT OR IGNORE INTO payment_methods(company_id,name,code,sort_order) VALUES(NEW.id,'Transferência','TRANSFER',5);
+ INSERT OR IGNORE INTO document_series(company_id,name,prefix,next_number) VALUES(NEW.id,'Factura','FT',1);
+END;
+";x.ExecuteNonQuery();EnsureColumn(c,"products","category_id","INTEGER");EnsureColumn(c,"products","unit_id","INTEGER");EnsureColumn(c,"invoices","payment_method_id","INTEGER");SeedDefaults(c);}
  static void EnsureColumn(SqliteConnection c,string table,string column,string type){using var q=c.CreateCommand();q.CommandText=$"PRAGMA table_info({table})";using var r=q.ExecuteReader();while(r.Read())if(string.Equals(r.GetString(1),column,StringComparison.OrdinalIgnoreCase))return;r.Close();q.CommandText=$"ALTER TABLE {table} ADD COLUMN {column} {type}";q.ExecuteNonQuery();}
- static void SeedDefaults(SqliteConnection c){using var q=c.CreateCommand();q.CommandText=@"INSERT OR IGNORE INTO units(company_id,name,abbreviation) SELECT id,'Unidade','UN' FROM companies;INSERT OR IGNORE INTO tax_rates(company_id,name,rate) SELECT id,'IVA normal',vat_rate FROM companies;INSERT OR IGNORE INTO payment_methods(company_id,name,code,sort_order) SELECT id,'Dinheiro','CASH',1 FROM companies;INSERT OR IGNORE INTO payment_methods(company_id,name,code,sort_order) SELECT id,'Cartão','CARD',2 FROM companies;INSERT OR IGNORE INTO payment_methods(company_id,name,code,sort_order) SELECT id,'M-Pesa','MPESA',3 FROM companies;INSERT OR IGNORE INTO payment_methods(company_id,name,code,sort_order) SELECT id,'e-Mola','EMOLA',4 FROM companies;INSERT OR IGNORE INTO payment_methods(company_id,name,code,sort_order) SELECT id,'Transferência','TRANSFER',5 FROM companies;";q.ExecuteNonQuery();}
+ static void SeedDefaults(SqliteConnection c){using var q=c.CreateCommand();q.CommandText=@"INSERT OR IGNORE INTO units(company_id,name,abbreviation) SELECT id,'Unidade','UN' FROM companies;INSERT OR IGNORE INTO tax_rates(company_id,name,rate) SELECT id,'IVA normal',vat_rate FROM companies;INSERT OR IGNORE INTO payment_methods(company_id,name,code,sort_order) SELECT id,'Dinheiro','CASH',1 FROM companies;INSERT OR IGNORE INTO payment_methods(company_id,name,code,sort_order) SELECT id,'Cartão','CARD',2 FROM companies;INSERT OR IGNORE INTO payment_methods(company_id,name,code,sort_order) SELECT id,'M-Pesa','MPESA',3 FROM companies;INSERT OR IGNORE INTO payment_methods(company_id,name,code,sort_order) SELECT id,'e-Mola','EMOLA',4 FROM companies;INSERT OR IGNORE INTO payment_methods(company_id,name,code,sort_order) SELECT id,'Transferência','TRANSFER',5 FROM companies;INSERT OR IGNORE INTO document_series(company_id,name,prefix,next_number) SELECT id,'Factura','FT',1 FROM companies;";q.ExecuteNonQuery();}
 }
