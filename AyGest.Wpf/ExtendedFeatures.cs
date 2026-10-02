@@ -19,16 +19,18 @@ public partial class MainWindow
     static void InjectAdvancedNavigation(object sender, RoutedEventArgs e)
     {
         if (sender is not MainWindow w) return;
+        try { w.extended.EnsureSchema(); } catch { return; }
         var root = FindPanels(w.Content as DependencyObject).FirstOrDefault(p => p.Children.OfType<Button>().Any(b => ButtonText(b) == "Relatórios"));
         if (root is null || root.Children.OfType<Button>().Any(b => ButtonText(b) == "Armazéns")) return;
         var report = root.Children.OfType<Button>().First(b => ButtonText(b) == "Relatórios");
         var index = root.Children.IndexOf(report) + 1;
-        root.Children.Insert(index++, w.Nav("Armazéns", "&#xE8B7;", (_,__) => w.Warehouses_Click()));
-        root.Children.Insert(index++, w.Nav("Devoluções", "&#xE7BA;", (_,__) => w.Returns_Click()));
-        root.Children.Insert(index++, w.Nav("Contas a receber", "&#xE8C8;", (_,__) => w.Receivables_Click()));
-        root.Children.Insert(index++, w.Nav("Contas a pagar", "&#xE8C8;", (_,__) => w.Payables_Click()));
-        root.Children.Insert(index, w.Nav("Despesas", "&#xE8C8;", (_,__) => w.Expenses_Click()));
-        try { w.extended.EnsureSchema(); } catch { }
+        root.Children.Insert(index++, w.Nav("Armazéns", "\uE8B7", (_,__) => w.Warehouses_Click()));
+        root.Children.Insert(index++, w.Nav("Devoluções", "\uE7BA", (_,__) => w.Returns_Click()));
+        root.Children.Insert(index++, w.Nav("Contas a receber", "\uE8C8", (_,__) => w.Receivables_Click()));
+        root.Children.Insert(index++, w.Nav("Contas a pagar", "\uE8C8", (_,__) => w.Payables_Click()));
+        root.Children.Insert(index++, w.Nav("Despesas", "\uE8C8", (_,__) => w.Expenses_Click()));
+        var settings = root.Children.OfType<Button>().FirstOrDefault(b => ButtonText(b) == "Configurações");
+        if (settings != null) root.Children.Insert(root.Children.IndexOf(settings), w.Nav("Configuração avançada", "\uE713", (_,__) => w.AdvancedSettings_Click(w,new())));
     }
 
     static IEnumerable<StackPanel> FindPanels(DependencyObject? root)
@@ -45,7 +47,7 @@ public partial class MainWindow
     {
         var b=new Button{Style=(Style)FindResource("SidebarButton"),Content=new StackPanel{Orientation=Orientation.Horizontal}};
         var p=(StackPanel)b.Content;
-        p.Children.Add(new TextBlock{Text=icon.Replace("&#xE8B7;", "\uE8B7").Replace("&#xE7BA;", "\uE7BA").Replace("&#xE8C8;", "\uE8C8"),FontFamily=new FontFamily("Segoe MDL2 Assets"),FontSize=15,Width=28});
+        p.Children.Add(new TextBlock{Text=icon,FontFamily=new FontFamily("Segoe MDL2 Assets"),FontSize=15,Width=28});
         p.Children.Add(new TextBlock{Text=text,VerticalAlignment=VerticalAlignment.Center});
         b.Click+=click; return b;
     }
