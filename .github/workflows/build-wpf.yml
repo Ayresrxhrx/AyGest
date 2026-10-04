@@ -1,26 +1,80 @@
-name: Build AyGest WPF
+name: Build AyGest POS
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - name: Checkout AyGest POS
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
       - name: Restore
         run: dotnet restore AyGest.Wpf/AyGest.Wpf.csproj
-      - name: Build
-        run: dotnet build AyGest.Wpf/AyGest.Wpf.csproj -c Release --no-restore
-      - name: Publish EXE
-        run: dotnet publish AyGest.Wpf/AyGest.Wpf.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
-      - name: Upload
+
+      - name: Build Release
+        run: dotnet build AyGest.Wpf/AyGest.Wpf.csproj --configuration Release --no-restore
+
+      - name: Publish Windows x64
+        run: dotnet publish AyGest.Wpf/AyGest.Wpf.csproj --configuration Release --runtime win-x64 --self-contained true --no-restore -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishReadyToRun=false -o publish
+
+      - name: Create portable ZIP
+        shell: powershell
+        run: Compress-Archive -Path publish\* -DestinationPath AyGest-POS-Windows-x64.zip -Force
+
+      - name: Install Inno Setup
+        shell: powershell
+        run: choco install innosetup --no-progress -y
+
+      - name: Create installer script
+        shell: powershell
+        run: |
+          @'
+          [Setup]
+          AppId={{B9A4C4D1-7A18-4D0A-9F91-AYGESTPOS2026}}
+          AppName=AyGest POS
+          AppVersion=1.0.0
+          AppPublisher=AyGest
+          DefaultDirName={autopf}\AyGest POS
+          DefaultGroupName=AyGest POS
+          OutputDir=installer
+          OutputBaseFilename=AyGest-POS-Setup
+          Compression=lzma2
+          SolidCompression=yes
+          ArchitecturesInstallIn64BitMode=x64
+          PrivilegesRequired=admin
+          UninstallDisplayIcon={app}\AyGest.exe
+
+          [Files]
+          Source: "publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+          [Icons]
+          Name: "{autodesktop}\AyGest POS"; Filename: "{app}\AyGest.exe"
+          Name: "{group}\AyGest POS"; Filename: "{app}\AyGest.exe"
+
+          [Run]
+          Filename: "{app}\AyGest.exe"; Description: "Abrir AyGest POS"; Flags: nowait postinstall skipifsilent
+          '@ | Set-Content -Path AyGest-POS.iss -Encoding UTF8
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' AyGest-POS.iss
+
+      - name: Upload AyGest POS packages
         uses: actions/upload-artifact@v4
         with:
-          name: AyGest-WPF-win-x64
-          path: publish/*
+          name: AyGest-POS-Windows-x64
+          path: |
+            AyGest-POS-Windows-x64.zip
+            installer/AyGest-POS-Setup.exe
           if-no-files-found: error
           retention-days: 14
